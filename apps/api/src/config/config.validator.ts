@@ -1,5 +1,5 @@
-import { plainToInstance, Type } from 'class-transformer';
-import { IsEnum, IsNumber, IsString, ValidateIf, validateSync } from 'class-validator';
+import { IsEnum, IsNumber, IsString, validateSync } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
 
 enum NodeEnv {
   DEVELOPMENT = 'development',
@@ -7,7 +7,7 @@ enum NodeEnv {
   TEST = 'test',
 }
 
-class AppConfig {
+class EnvConfig {
   @IsString()
   APP_NAME: string = 'nexujuris';
 
@@ -15,43 +15,20 @@ class AppConfig {
   NODE_ENV: NodeEnv = NodeEnv.DEVELOPMENT;
 
   @IsNumber()
-  @ValidateIf((o) => !o.PORT)
   PORT: number = 3001;
-}
 
-class DatabaseConfig {
   @IsString()
   DATABASE_URL: string = '';
-}
 
-class RedisConfig {
   @IsString()
   REDIS_HOST: string = 'localhost';
 
   @IsNumber()
   REDIS_PORT: number = 6379;
-
-  @ValidateIf((o) => o.REDIS_PASSWORD !== '')
-  @IsString()
-  REDIS_PASSWORD?: string;
-
-  @IsNumber()
-  REDIS_DB: number = 0;
-}
-
-export class EnvValidation {
-  @Type(() => AppConfig)
-  app: AppConfig = new AppConfig();
-
-  @Type(() => DatabaseConfig)
-  database: DatabaseConfig = new DatabaseConfig();
-
-  @Type(() => RedisConfig)
-  redis: RedisConfig = new RedisConfig();
 }
 
 export function validateEnv(config: Record<string, unknown>) {
-  const validatedConfig = plainToInstance(EnvValidation, config, {
+  const validatedConfig = plainToInstance(EnvConfig, config, {
     enableImplicitConversion: true,
   });
 
