@@ -2,11 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 describe('AuthService', () => {
   let service: AuthService;
   let prismaService: PrismaService;
+  let jwtService: JwtService;
 
   beforeEach(async () => {
     const mockPrisma = {
@@ -17,8 +19,8 @@ describe('AuthService', () => {
     };
 
     const mockJwt = {
-      sign: jest.fn().mockReturnValue('mock-token'),
-      verify: jest.fn().mockReturnValue({ sub: 'user-id' }),
+      sign: jest.fn().mockReturnValue('mock-access-token'),
+      verify: jest.fn().mockReturnValue({ sub: 'user-id', email: 'test@example.com', tenantId: 'tenant-1', role: 'USUARIO' }),
     };
 
     const mockConfig = {
@@ -37,12 +39,14 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: JwtService, useValue: mockJwt },
         { provide: ConfigService, useValue: mockConfig },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
     prismaService = module.get<PrismaService>(PrismaService);
+    jwtService = module.get<JwtService>(JwtService);
   });
 
   it('should be defined', () => {
@@ -61,18 +65,34 @@ describe('AuthService', () => {
         role: 'USUARIO',
       } as any);
 
-      const result = await service.login({ email: 'test@example.com', password: 'password123' });
+      const result = await service.login({ email: 'test@example.com', password: 'password123', tenantId: 'tenant-1' });
 
       expect(result.access_token).toBeDefined();
       expect(result.refresh_token).toBeDefined();
     });
 
-    it('should throw error on invalid credentials', async () => {
+    it('should throw error on user not found', async () => {
       jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(null);
 
       await expect(
-        service.login({ email: 'test@example.com', password: 'wrongpassword' }),
-      ).rejects.toThrow('Invalid credentials');
+        service.login({ email: 'test@example.com', password: 'password123', tenantId: 'tenant-1' }),
+      ).rejects.toThrow('Credenciais inválidas');
+    });
+
+    it('should throw error on invalid password', async () => {
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        password: hashedPassword,
+        name: 'Test User',
+        tenantId: 'tenant-1',
+        role: 'USUARIO',
+      } as any);
+
+      await expect(
+        service.login({ email: 'test@example.com', password: 'wrongpassword', tenantId: 'tenant-1' }),
+      ).rejects.toThrow('Credenciais inválidas');
     });
   });
 
@@ -92,16 +112,29 @@ describe('AuthService', () => {
         email: 'new@example.com',
         password: 'password123',
         name: 'New User',
+        tenantId: 'tenant-1',
       });
 
       expect(result.email).toBe('new@example.com');
       expect(result.password).toBeUndefined();
     });
 
-    it('should throw error if email exists', async () => {
+    it('should throw error if tenantId is missing', async () => {
+      await expect(
+        service.register({
+          email: 'new@example.com',
+          password: 'password123',
+          name: 'New User',
+          tenantId: '',
+        }),
+      ).rejects.toThrow('tenantId é obrigatório para registro');
+    });
+
+    it('should throw error if email exists in tenant', async () => {
       jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue({
         id: 'existing-user',
         email: 'existing@example.com',
+        tenantId: 'tenant-1',
       } as any);
 
       await expect(
@@ -109,8 +142,9 @@ describe('AuthService', () => {
           email: 'existing@example.com',
           password: 'password123',
           name: 'Existing User',
+          tenantId: 'tenant-1',
         }),
-      ).rejects.toThrow('Email already exists');
+      ).rejects.toThrow('Email já está em uso neste tenant');
     });
   });
 

@@ -108,10 +108,9 @@ model Cliente {
   processos    Processo[]
   documentos  Documento[]
   financeiro  Financeiro[]
-  whatsapp   WhatsAppConversation[]
+  whatsappConversas WhatsAppConversation[]
 
   @@index([tenantId, active])
-  @@index([tenantId, whatsapp])
   @@index([tenantId, cpf])
   @@map("clientes")
 }
@@ -153,7 +152,7 @@ model Processo {
   @@index([tenantId, tribunal])
   @@index([tenantId, status])
   @@index([tenantId, clienteId])
-  @@index([processoId, createdAt])
+  @@index([createdAt])
   @@map("processos")
 }
 

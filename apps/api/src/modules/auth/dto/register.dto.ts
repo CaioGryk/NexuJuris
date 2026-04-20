@@ -10,9 +10,10 @@ export class RegisterDto {
   password: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'name é obrigatório' })
   name: string;
 
   @IsString()
-  tenantId?: string;
+  @IsNotEmpty({ message: 'tenantId é obrigatório' })
+  tenantId: string;
 }

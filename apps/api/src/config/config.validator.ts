@@ -46,12 +46,15 @@ export function validateEnv(config: Record<string, unknown>) {
 
   const errors = validateSync(validatedConfig, {
     skipMissingProperties: false,
-    whitelist: true,
-    forbidNonWhitelisted: true,
+    whitelist: false,
+    forbidNonWhitelisted: false,
   });
 
   if (errors.length > 0) {
-    const messages = errors.map((e) => `${e.property}: ${e.constraints?.join(', ')}`).join('; ');
+    const messages = errors.map((e) => {
+      const constraints = e.constraints ? Object.values(e.constraints).join(', ') : 'unknown';
+      return `${e.property}: ${constraints}`;
+    }).join('; ');
     throw new Error(`Environment validation failed: ${messages}`);
   }
 

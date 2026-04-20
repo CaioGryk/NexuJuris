@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
-import { LoginDto } from '../dto/login.dto';
-import { RegisterDto } from '../dto/register.dto';
-import { JwtPayload } from '../types/jwt-payload.interface';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { JwtPayload } from './types/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -16,12 +16,21 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    if (!dto.tenantId) {
+      throw new BadRequestException('tenantId é obrigatório para registro');
+    }
+
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: {
+        tenantId_email: {
+          tenantId: dto.tenantId,
+          email: dto.email,
+        },
+      },
     });
 
     if (existingUser) {
-      throw new Error('Email already exists');
+      throw new ConflictException('Email já está em uso neste tenant');
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -31,7 +40,7 @@ export class AuthService {
         email: dto.email,
         name: dto.name,
         password: hashedPassword,
-        tenantId: dto.tenantId || 'default',
+        tenantId: dto.tenantId,
         role: 'USUARIO',
       },
     });
@@ -42,17 +51,22 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: {
+        tenantId_email: {
+          tenantId: dto.tenantId,
+          email: dto.email,
+        },
+      },
     });
 
     if (!user) {
-      throw new Error('Invalid credentials');
+      throw new UnauthorizedException('Credenciais inválidas');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
 
     if (!isPasswordValid) {
-      throw new Error('Invalid credentials');
+      throw new UnauthorizedException('Credenciais inválidas');
     }
 
     const payload: JwtPayload = {
@@ -95,7 +109,7 @@ export class AuthService {
       });
 
       if (!user) {
-        throw new Error('User not found');
+        throw new UnauthorizedException('Usuário não encontrado');
       }
 
       const newPayload: JwtPayload = {
@@ -113,8 +127,11 @@ export class AuthService {
       return {
         access_token: accessToken,
       };
-    } catch {
-      throw new Error('Invalid refresh token');
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Refresh token inválido');
     }
   }
 
@@ -124,7 +141,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new Error('User not found');
+      throw new UnauthorizedException('Usuário não encontrado');
     }
 
     const { password, ...result } = user;

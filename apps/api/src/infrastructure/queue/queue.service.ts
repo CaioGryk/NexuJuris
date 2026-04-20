@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Queue, Worker } from 'bullmq';
+import { Queue, Worker, Job } from 'bullmq';
 import { RedisService } from '../redis/redis.service';
 
 export interface QueueConfig {
@@ -70,7 +70,7 @@ export class QueueService implements OnModuleDestroy {
 
   createWorker(
     name: string,
-    processor: (job: { id: string; data: unknown }) => Promise<unknown>,
+    processor: (job: Job) => Promise<unknown>,
     options?: { concurrency?: number },
   ): Worker {
     const existingWorker = this.workers.get(name);
