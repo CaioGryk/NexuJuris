@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { HealthModule } from './modules/health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { QueueModule } from './infrastructure/queue/queue.module';
@@ -17,6 +18,9 @@ import { validateEnv } from './config/config.validator';
 
     // Health check
     HealthModule,
+
+    // Auth
+    AuthModule,
 
     // Database
     PrismaModule,

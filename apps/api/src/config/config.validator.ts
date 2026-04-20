@@ -25,6 +25,18 @@ class EnvConfig {
 
   @IsNumber()
   REDIS_PORT: number = 6379;
+
+  @IsString()
+  JWT_SECRET: string = '';
+
+  @IsString()
+  JWT_EXPIRES_IN: string = '15m';
+
+  @IsString()
+  JWT_REFRESH_SECRET: string = '';
+
+  @IsString()
+  JWT_REFRESH_EXPIRES_IN: string = '7d';
 }
 
 export function validateEnv(config: Record<string, unknown>) {
