@@ -1,29 +1,33 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HealthService } from './health.service';
+import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { RedisService } from '../../infrastructure/redis/redis.service';
 
 describe('HealthService', () => {
   let service: HealthService;
-  let mockPrisma: any;
-  let mockRedis: any;
+  let prismaService: PrismaService;
+  let redisService: RedisService;
 
   beforeEach(async () => {
-    mockPrisma = {
+    const mockPrisma = {
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
-    mockRedis = {
+    const mockRedis = {
       ping: jest.fn().mockResolvedValue('PONG'),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         HealthService,
-        { provide: mockPrisma, useValue: mockPrisma },
-        { provide: mockRedis, useValue: mockRedis },
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: RedisService, useValue: mockRedis },
       ],
     }).compile();
 
     service = module.get<HealthService>(HealthService);
+    prismaService = module.get<PrismaService>(PrismaService);
+    redisService = module.get<RedisService>(RedisService);
   });
 
   it('should be defined', () => {
@@ -41,7 +45,7 @@ describe('HealthService', () => {
     });
 
     it('should return error when database fails', async () => {
-      mockPrisma.$queryRaw = jest.fn().mockRejectedValue(new Error('DB Error'));
+      jest.spyOn(prismaService, '$queryRaw').mockRejectedValueOnce(new Error('DB Error'));
 
       const result = await service.check();
 
@@ -50,7 +54,7 @@ describe('HealthService', () => {
     });
 
     it('should return error when Redis fails', async () => {
-      mockRedis.ping = jest.fn().mockRejectedValue(new Error('Redis Error'));
+      jest.spyOn(redisService, 'ping').mockRejectedValueOnce(new Error('Redis Error'));
 
       const result = await service.check();
 
@@ -67,7 +71,7 @@ describe('HealthService', () => {
     });
 
     it('should return error when database fails', async () => {
-      mockPrisma.$queryRaw = jest.fn().mockRejectedValue(new Error('Connection failed'));
+      jest.spyOn(prismaService, '$queryRaw').mockRejectedValueOnce(new Error('Connection failed'));
 
       const result = await service.checkDatabase();
 
@@ -84,7 +88,7 @@ describe('HealthService', () => {
     });
 
     it('should return error when Redis returns unexpected response', async () => {
-      mockRedis.ping = jest.fn().mockResolvedValue('UNEXPECTED');
+      jest.spyOn(redisService, 'ping').mockResolvedValueOnce('UNEXPECTED');
 
       const result = await service.checkRedis();
 
@@ -93,7 +97,7 @@ describe('HealthService', () => {
     });
 
     it('should return error when Redis fails', async () => {
-      mockRedis.ping = jest.fn().mockRejectedValue(new Error('Connection refused'));
+      jest.spyOn(redisService, 'ping').mockRejectedValueOnce(new Error('Connection refused'));
 
       const result = await service.checkRedis();
 
@@ -110,7 +114,7 @@ describe('HealthService', () => {
     });
 
     it('should return error when any dependency is not ready', async () => {
-      mockPrisma.$queryRaw = jest.fn().mockRejectedValue(new Error('DB Error'));
+      jest.spyOn(prismaService, '$queryRaw').mockRejectedValueOnce(new Error('DB Error'));
 
       const result = await service.checkReadiness();
 

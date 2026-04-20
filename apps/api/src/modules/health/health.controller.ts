@@ -1,5 +1,5 @@
-import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
-import { HealthService, HealthStatus } from './health.service';
+import { Controller, Get, HttpCode, HttpStatus, HttpException } from '@nestjs/common';
+import { HealthService } from './health.service';
 
 @Controller('health')
 export class HealthController {
@@ -7,8 +7,12 @@ export class HealthController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
-  check() {
-    return this.healthService.check();
+  async check() {
+    const result = await this.healthService.check();
+    if (result.status === 'error') {
+      throw new HttpException(result, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    return result;
   }
 
   @Get('live')
@@ -20,18 +24,30 @@ export class HealthController {
   @Get('ready')
   @HttpCode(HttpStatus.OK)
   async ready() {
-    return this.healthService.checkReadiness();
+    const result = await this.healthService.checkReadiness();
+    if (result.status === 'error') {
+      throw new HttpException(result, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    return result;
   }
 
   @Get('db')
   @HttpCode(HttpStatus.OK)
   async db() {
-    return this.healthService.checkDatabase();
+    const result = await this.healthService.checkDatabase();
+    if (result.status === 'error') {
+      throw new HttpException(result, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    return result;
   }
 
   @Get('redis')
   @HttpCode(HttpStatus.OK)
   async redis() {
-    return this.healthService.checkRedis();
+    const result = await this.healthService.checkRedis();
+    if (result.status === 'error') {
+      throw new HttpException(result, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    return result;
   }
 }
