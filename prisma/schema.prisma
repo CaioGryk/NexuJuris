@@ -1,0 +1,337 @@
+// =====================================================
+// NEXUJURIS - PRISMA SCHEMA
+// =====================================================
+// Legal SaaS Platform - Database Models
+// =====================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================
+// TENANT & MULTI-TENANCY
+// =====================================================
+
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  document    String?  // CNPJ/CPF
+  domain      String?
+  logo        String?
+  settings   Json?
+  active     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users      User[]
+  clientes   Cliente[]
+  processos  Processo[]
+  documents  Documento[]
+  financeiro Financeiro[]
+  whatsapp   WhatsAppConversation[]
+
+  @@map("tenants")
+}
+
+// =====================================================
+// USERS & AUTH
+// =====================================================
+
+model User {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  
+  email       String
+  name       String
+  password   String
+  role       UserRole  @default(USUARIO)
+  avatar     String?
+  phone     String?
+  oab       String?   // OAB number
+  active     Boolean   @default(true)
+  lastLogin   DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  clientes    Cliente[]
+  processos  Processo[]
+  andamentos Andamento[]
+  documents  Documento[]
+  financial  Financeiro[]
+  pjeConfig   PJeConfig?
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  USUARIO
+  ESTAGIARIO
+}
+
+// =====================================================
+// CLIENTES / CRM
+// =====================================================
+
+model Cliente {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+
+  nome        String
+  whatsapp   String?
+  cpf        String?
+  email      String?
+  endereco   String?
+  observacoes String?
+  origem     String    @default("manual")
+  active     Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  processos  Processo[]
+  documentos Documento[]
+  financeiro Financeiro[]
+  whatsapp   WhatsAppConversation[]
+
+  @@map("clientes")
+}
+
+// =====================================================
+// PROCESSOS JUDICIAIS
+// =====================================================
+
+model Processo {
+  id             String    @id @default(uuid())
+  tenantId        String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+  clienteId      String?
+  cliente       Cliente?  @relation(fields: [clienteId], references: [id])
+  userId         String
+  user          User      @relation(fields: [userId], references: [id])
+
+  numeroProcesso String
+  tribunal      String?
+  classe       String?
+  orgaoJulgador String?
+  distribuicao DateTime?
+  valorCausa   Decimal?  @db.Decimal(15, 2)
+  partes       String?
+  objeto       String?
+  status       String    @default("ativo")
+  active       Boolean   @default(true)
+  ultimoAndamento DateTime?
+  
+  createdAt    DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  andamentos    Andamento[]
+  pjeComunicacoes PJeComunicacao[]
+  documentos    Documento[]
+  financeiro   Financeiro[]
+
+  @@unique([tenantId, numeroProcesso])
+  @@map("processos")
+}
+
+// =====================================================
+// ANDAMENTOS
+// =====================================================
+
+model Andamento {
+  id          String     @id @default(uuid())
+  processoId  String
+  processo    Processo   @relation(fields: [processoId], references: [id])
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+
+  data        DateTime
+  descricao   String
+  tipo       String?
+  prazo      DateTime?
+  concluido  Boolean   @default(false)
+
+  createdAt   DateTime   @default(now())
+
+  @@map("andamentos")
+}
+
+// =====================================================
+// PJE - COMUNICAÇÕES PROCESSUAIS
+// =====================================================
+
+model PJeConfig {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+
+  username         String
+  passwordEncoded String
+  useHomologation  Boolean  @default(false)
+  tribunais        String[] @default(["TJSP"])
+  active          Boolean  @default(true)
+  lastSync        DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("pje_config")
+}
+
+model PJeComunicacao {
+  id              String   @id @default(uuid())
+  processoId       String
+  processo        Processo @relation(fields: [processoId], references: [id])
+
+  tipo            String
+  meio            String
+  dataPublicacao  DateTime
+  descricao       String?
+  documento      Json?
+  visualizada    Boolean  @default(false)
+  importedAt     DateTime  @default(now())
+
+  @@map("pje_comunicacoes")
+}
+
+// =====================================================
+// WHATSAPP
+// =====================================================
+
+model WhatsAppConversation {
+  id            String    @id @default(uuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  clienteId    String?
+  cliente      Cliente?  @relation(fields: [clienteId], references: [id])
+
+  phoneNumber  String
+  sessionId   String?
+  lastMessage DateTime?
+  status      String    @default("ativa")
+
+  createdAt   DateTime  @default(now())
+
+  messages   WhatsAppMessage[]
+
+  @@unique([tenantId, phoneNumber])
+  @@map("whatsapp_conversas")
+}
+
+model WhatsAppMessage {
+  id          String               @id @default(uuid())
+  conversaId  String
+  conversa    WhatsAppConversation @relation(fields: [conversaId], references: [id])
+
+  direction  String  // entrada | saida
+  content    String
+  type       String   @default("texto")
+  sid        String?
+  status     String   @default("enviada")
+
+  createdAt  DateTime @default(now())
+
+  @@map("whatsapp_mensagens")
+}
+
+// =====================================================
+// DOCUMENTOS
+// =====================================================
+
+model Documento {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  processoId  String?
+  processo    Processo? @relation(fields: [processoId], references: [id])
+  clienteId   String?
+  cliente    Cliente?  @relation(fields: [clienteId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+
+  titulo      String
+  tipo       String
+  conteudo   String?
+  arquivoUrl String?
+  tags       String[]
+  active     Boolean   @default(true)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("documentos")
+}
+
+// =====================================================
+// FINANCEIRO
+// =====================================================
+
+model Financeiro {
+  id              String    @id @default(uuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  clienteId       String?
+  cliente        Cliente?  @relation(fields: [clienteId], references: [id])
+  processoId     String?
+  processo       Processo? @relation(fields: [processoId], references: [id])
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+
+  descricao      String
+  tipo          FinanceiroTipo
+  categoria     String?
+  valor         Decimal   @db.Decimal(15, 2)
+  dataVencimento DateTime
+  dataPagamento DateTime?
+  status        FinanceiroStatus @default(PENDENTE)
+  observacoes   String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("financeiro")
+}
+
+enum FinanceiroTipo {
+  RECEITA
+  DESPESA
+}
+
+enum FinanceiroStatus {
+  PENDENTE
+  PAGO
+  CANCELADO
+}
+
+// =====================================================
+// AUDIT LOG
+// =====================================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  changes   Json?
+  ip       String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+  @@index([tenantId, createdAt])
+}
