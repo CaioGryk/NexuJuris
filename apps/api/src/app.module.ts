@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { ClientesModule } from './modules/clientes/clientes.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { QueueModule } from './infrastructure/queue/queue.module';
@@ -25,6 +26,9 @@ import { validateEnv } from './config/config.validator';
 
     // Users
     UsersModule,
+
+    // Clientes
+    ClientesModule,
 
     // Database
     PrismaModule,
