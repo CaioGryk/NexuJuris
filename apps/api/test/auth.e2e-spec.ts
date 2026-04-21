@@ -147,4 +147,23 @@ describe('AuthController (e2e)', () => {
         .expect(401);
     });
   });
+
+  describe('GET /api/auth/tenant-context', () => {
+    it('should return tenant context with valid token', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/auth/tenant-context')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.tenantId).toBe(testTenantId);
+      expect(response.body.userId).toBeDefined();
+      expect(response.body.role).toBeDefined();
+    });
+
+    it('should return 401 without token', async () => {
+      await request(app.getHttpServer())
+        .get('/api/auth/tenant-context')
+        .expect(401);
+    });
+  });
 });

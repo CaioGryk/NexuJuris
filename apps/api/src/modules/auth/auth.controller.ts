@@ -4,6 +4,10 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { TenantContextGuard } from '../../common/guards/tenant-context.guard';
+import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { TenantContext } from '../../common/interfaces/tenant-context.interface';
 import { Request } from 'express';
 
 interface AuthRequest extends Request {
@@ -42,5 +46,20 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async getCurrentUser(@Req() req: AuthRequest) {
     return this.authService.getCurrentUser(req.user.sub);
+  }
+
+  @Get('tenant-context')
+  @UseGuards(JwtAuthGuard, TenantContextGuard)
+  @HttpCode(HttpStatus.OK)
+  async getTenantContext(
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: { sub: string; email: string; tenantId: string; role: string },
+  ) {
+    return {
+      userId: tenant.userId,
+      tenantId: tenant.tenantId,
+      role: tenant.role,
+      email: user?.email,
+    };
   }
 }
